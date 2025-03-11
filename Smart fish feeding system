@@ -1,0 +1,75 @@
+#define BLYNK_TEMPLATE_ID "*********************************"
+#define BLYNK_TEMPLATE_NAME "Smart fish feeding system"
+#define BLYNK_AUTH_TOKEN "***************************************"
+
+#define BLYNK_PRINT Serial
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+
+char ssid[] = "**************";
+char pass[] = "**************";
+
+BlynkTimer timer;
+
+#define pumpRelay 27          // Relay for the pump
+#define feederRelay 26        // Relay for the food feeder
+#define waterQualitySensor 25 // Analog pin for the water quality sensor
+
+void setup() {
+  Serial.begin(9600);
+  
+  pinMode(pumpRelay, OUTPUT);
+  pinMode(feederRelay, OUTPUT);
+  digitalWrite(pumpRelay, HIGH);  // Initialize pump relay to OFF (HIGH for active LOW relays)
+  digitalWrite(feederRelay, HIGH); // Initialize feeder relay to OFF (HIGH for active LOW relays)
+
+  // Connect to Blynk
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass, "blynk.cloud", 80);
+  
+  // Wait until connected
+  while (Blynk.connect() == false) {
+    Serial.print(".");
+    delay(1000);
+  }
+  Serial.println("Connected to Blynk!");
+
+  timer.setInterval(2000L, readWaterQuality); // Set a timer to read water quality every 2 seconds
+}
+
+// Function to read water quality sensor and send the value to Blynk
+void readWaterQuality() {
+  int waterQualityValue = analogRead(waterQualitySensor); // Read the sensor value
+  Blynk.virtualWrite(V0, waterQualityValue); // Send the value to virtual pin V4
+  Serial.print("Water Quality Value: ");
+  Serial.println(waterQualityValue);
+}
+
+// Get the button value for pump relay
+BLYNK_WRITE(V2) { // Virtual pin V2 for pump control
+  bool pumpState = param.asInt();
+  if (pumpState == 1) {
+    digitalWrite(pumpRelay, LOW); // Turn pump ON
+    Serial.println("Pump is ON");
+  } else {
+    digitalWrite(pumpRelay, HIGH); // Turn pump OFF
+    Serial.println("Pump is OFF");
+  }
+}
+
+// Get the button value for food feeder relay
+BLYNK_WRITE(V1) { // Virtual pin V3 for food feeder control
+  bool feederState = param.asInt();
+  if (feederState == 1) {
+    digitalWrite(feederRelay, LOW); // Turn feeder ON
+    Serial.println("Food Feeder is ON");
+  } else {
+    digitalWrite(feederRelay, HIGH); // Turn feeder OFF
+    Serial.println("Food Feeder is OFF");
+  }
+}
+
+void loop() {
+  Blynk.run();  // Run the Blynk library
+  timer.run();  // Run the Blynk timer
+}
