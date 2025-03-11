@@ -1,0 +1,99 @@
+#define BLYNK_TEMPLATE_ID "****************"
+#define BLYNK_TEMPLATE_NAME "Smart sericulture System"
+#define BLYNK_AUTH_TOKEN "*****************************"
+
+#define BLYNK_PRINT Serial
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+#include <DHT.h>
+
+char ssid[] = "********";
+char pass[] = "********";
+
+BlynkTimer timer;
+
+#define sensor1 33 // Soil moisture sensor
+#define dhtPin 25 // DHT11 sensor
+#define mq3Pin 34 // MQ3 sensor
+#define relay1 27
+#define relay2 26
+
+DHT dht(dhtPin, DHT11);
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(relay1, OUTPUT);
+  pinMode(relay2, OUTPUT);
+  digitalWrite(relay1, LOW);
+  digitalWrite(relay2, LOW);
+
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass, "blynk.cloud", 80);
+
+  timer.setInterval(1500L, soilMoistureSensor);
+  timer.setInterval(2000L, readDHT11);
+  timer.setInterval(2500L, readMQ3);
+}
+
+//Get the soil moisture value
+void soilMoistureSensor() {
+  int value1 = analogRead(sensor1);
+  value1 = map(value1, 0, 1024, 0, 100);
+  value1 = (value1 - 399) * -1;
+  if (value1 > 100) {
+    value1 = 100;
+  }
+  Blynk.virtualWrite(V0, value1);
+
+  Serial.print("Moisture value sensor1: ");
+  Serial.println(value1);
+}
+
+//Get the DHT11 sensor values
+void readDHT11() {
+  float temperature = dht.readTemperature();
+  Blynk.virtualWrite(V1, temperature);
+
+  Serial.print("Temperature: ");
+  Serial.println(temperature);
+}
+
+//Get the MQ3 sensor value
+void readMQ3() {
+  int value = analogRead(mq3Pin);
+  value = map(value, 0, 1024, 0, 100);
+  Blynk.virtualWrite(V2, value);
+
+  Serial.print("MQ3 value: ");
+  Serial.println(value);
+}
+
+//Get the button value for relay1
+BLYNK_WRITE(V3) {
+  bool relayState = param.asInt();
+  if (relayState == 1) {
+    digitalWrite(relay1, LOW);
+    Serial.println("Relay 1 is ON");
+  } else {
+    digitalWrite(relay1, HIGH);
+    Serial.println("Relay 1 is OFF");
+  }
+}
+
+//Get the button value for relay2
+BLYNK_WRITE(V4) {
+  bool relayState = param.asInt();
+  if (relayState == 1) {
+    digitalWrite(relay2, LOW);
+    Serial.println("Relay 2 is ON");
+  } else {
+    digitalWrite(relay2, HIGH);
+    Serial.println("Relay 2 is OFF");
+  }
+}
+
+
+void loop() {
+  Blynk.run();  //Run the Blynk library
+  timer.run();  //Run the Blynk timer
+}
