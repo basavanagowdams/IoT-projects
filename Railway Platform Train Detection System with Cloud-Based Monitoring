@@ -1,0 +1,103 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClient.h>
+#include <WiFiClientSecureBearSSL.h>
+#include <LiquidCrystal_I2C.h>
+
+//-----------------------------------------
+#define BUZZER   D8
+#define IR_SENSOR_PIN D7  // Connect your IR sensor to D7 pin
+//-----------------------------------------
+
+// Google Sheets URL
+const String sheet_url = "************************************************************************************************************************************";  // Enter Google Script URL
+
+#define WIFI_SSID "*********"  // Enter WiFi Name
+#define WIFI_PASSWORD "*********"  // Enter WiFi Password
+
+// Initialize the LCD display
+LiquidCrystal_I2C lcd(0x27, 16, 2);  // Change LCD Address to 0x27 if 0x3F doesn't work
+
+void setup() {
+  Serial.begin(9600);
+  lcd.init();
+  lcd.backlight();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("  Initializing  ");
+  delay(2000);
+
+  // WiFi Connectivity
+  Serial.print("Connecting to AP");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(200);
+  }
+  Serial.println("");
+  Serial.println("WiFi connected.");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  // Set BUZZER as OUTPUT
+  pinMode(BUZZER, OUTPUT);
+  pinMode(IR_SENSOR_PIN, INPUT); // Set IR sensor pin as INPUT
+}
+
+void loop() {
+  // Read the IR sensor value
+  int irValue = digitalRead(IR_SENSOR_PIN);
+  
+  // Check if the IR sensor value is LOW (train detected)
+  if (irValue == LOW) {
+    Serial.println("Train reached, logging data...");
+    logData("Train reached");
+    
+    // Indicate with buzzer
+    digitalWrite(BUZZER, HIGH);
+    delay(200);
+    digitalWrite(BUZZER, LOW);
+    delay(200);
+    
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(" Train Reached! ");
+    delay(2000); // Display for 2 seconds
+  } 
+  // If the IR sensor value is HIGH (platform empty)
+  else {
+    Serial.println("Platform empty, logging data...");
+    logData("Platform empty");
+    
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(" Platform Empty  ");
+    delay(2000); // Display for 2 seconds
+  }
+
+  delay(100); // Check every 100 ms
+}
+
+void logData(String message) {
+  WiFiClientSecure client;
+  client.setInsecure(); // Disable SSL certificate verification (not recommended for production)
+
+  // Construct the URL for the Google Apps Script
+  String url = sheet_url + message;
+
+  // Send the HTTP GET request
+  if (client.connect("script.google.com", 443)) {
+    client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+                 "Host: script.google.com\r\n" +
+                 "Connection: close\r\n\r\n");
+    delay(500); // Wait for the response
+
+    // Read the response
+    while (client.available()) {
+      String line = client.readStringUntil('\n');
+      Serial.println(line);
+    }
+  } else {
+    Serial.println("Connection failed");
+  }
+}
